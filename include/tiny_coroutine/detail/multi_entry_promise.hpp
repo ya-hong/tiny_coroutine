@@ -5,7 +5,6 @@
 #include "handle.hpp"
 #include "scheduler_impl.hpp"
 
-
 namespace tiny_coroutine {
 
 template <typename T>
@@ -63,7 +62,6 @@ private:
 	bool stored_;
 };
 
-
 template <typename T>
 class multi_entry_promise : public multi_temporary_store<T> {
 public:
@@ -71,9 +69,13 @@ public:
 		return generator<T>(multi_entry_handle<T>::from_promise(*this));
 	}
 
-	std::suspend_always initial_suspend() noexcept {return {};}
+	std::suspend_always initial_suspend() noexcept {
+		return {};
+	}
 
-	std::suspend_never final_suspend() noexcept {return {};}
+	std::suspend_never final_suspend() noexcept {
+		return {};
+	}
 
 	std::coroutine_handle<>& parent_handle() noexcept {
 		return parent_handle_;
@@ -89,7 +91,8 @@ public:
 		if (parent_handle() && !parent_handle().done()) {
 			std::cout << "spawn parent" << std::endl;
 			scheduler_impl::local()->spawn_handle(parent_handle());
-			scheduler_impl::local()->spawn_handle(multi_entry_handle<T>::from_promise(*this));
+			scheduler_impl::local()->spawn_handle(
+				multi_entry_handle<T>::from_promise(*this));
 		}
 		return {};
 	}
@@ -100,7 +103,6 @@ private:
 	std::coroutine_handle<> parent_handle_;
 };
 
+}  // namespace detail
 
-}
-
-}
+}  // namespace tiny_coroutine

@@ -2,7 +2,6 @@
 
 #include <coroutine>
 
-
 namespace tiny_coroutine {
 
 namespace detail {
@@ -19,6 +18,6 @@ using handle = std::coroutine_handle<promise<T>>;
 template <typename T>
 using multi_entry_handle = std::coroutine_handle<multi_entry_promise<T>>;
 
-}
+}  // namespace detail
 
-}
+}  // namespace tiny_coroutine

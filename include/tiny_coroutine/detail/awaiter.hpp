@@ -25,11 +25,11 @@ public:
 	T await_resume() {
 		return waited_.promise().result();
 	}
-	
+
 private:
 	handle<T> waited_;
 };
 
-}
+}  // namespace detail
 
-}
+}  // namespace tiny_coroutine

@@ -6,7 +6,6 @@
 #include "scheduler_impl.hpp"
 // #include "../task.hpp"
 
-
 namespace tiny_coroutine {
 
 template <typename T>
@@ -14,12 +13,13 @@ class task;
 
 namespace detail {
 
-
 class promise_no_type {
 public:
 	promise_no_type() : parent_handle_(nullptr) {}
 
-	std::suspend_always initial_suspend() noexcept {return {};}
+	std::suspend_always initial_suspend() noexcept {
+		return {};
+	}
 
 	std::suspend_always final_suspend() noexcept {
 		if (parent_handle() && !parent_handle().done()) {
@@ -41,7 +41,6 @@ private:
 	std::coroutine_handle<> parent_handle_;
 };
 
-
 template <typename T>
 class temporary_store {
 public:
@@ -52,6 +51,7 @@ public:
 	T result() {
 		return std::forward<T>(value_);
 	}
+
 private:
 	T value_;
 };
@@ -66,6 +66,7 @@ public:
 	T& result() {
 		return *ptr_;
 	}
+
 private:
 	T* ptr_;
 };
@@ -77,7 +78,6 @@ public:
 	void result() {}
 };
 
-
 template <typename T>
 class promise : public promise_no_type, public temporary_store<T> {
 public:
@@ -86,7 +86,6 @@ public:
 	}
 };
 
+}  // namespace detail
 
-}
-
-}
+}  // namespace tiny_coroutine

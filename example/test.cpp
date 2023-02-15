@@ -1,12 +1,11 @@
 #include <iostream>
 #include <string>
 
-
-#include "tiny_coroutine/task.hpp"
-#include "tiny_coroutine/scheduler.hpp"
 #include "tiny_coroutine/detail/promise.hpp"
-#include "tiny_coroutine/utils.hpp"
 #include "tiny_coroutine/generator.hpp"
+#include "tiny_coroutine/scheduler.hpp"
+#include "tiny_coroutine/task.hpp"
+#include "tiny_coroutine/utils.hpp"
 
 using namespace tiny_coroutine;
 
@@ -50,11 +49,10 @@ task<void> update_loop() {
 
 task<void> check() {
 	auto&& x = co_await return_reference();
-	co_await tiny_coroutine::condition([&x]() mutable {return x > 5;});
+	co_await tiny_coroutine::condition([&x]() mutable { return x > 5; });
 	print(x);
 	co_return;
 }
-
 
 generator<int> gen() {
 	for (int i = 0; i < 5; ++i) {
@@ -71,8 +69,6 @@ task<void> print_gen() {
 	}
 	co_return;
 }
-
-
 
 int main() {
 	scheduler s;

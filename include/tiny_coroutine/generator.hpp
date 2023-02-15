@@ -1,9 +1,9 @@
 #pragma once
 
-#include "detail/multi_entry_awaiter.hpp"
 #include "detail/handle.hpp"
-#include "detail/scheduler_impl.hpp"
+#include "detail/multi_entry_awaiter.hpp"
 #include "detail/multi_entry_promise.hpp"
+#include "detail/scheduler_impl.hpp"
 
 namespace tiny_coroutine {
 
@@ -18,7 +18,6 @@ template <class T>
 class generator {
 	using handle = detail::multi_entry_handle<T>;
 	using awaiter = detail::multi_entry_awaiter<T>;
-	
 
 public:
 	using promise_type = detail::multi_entry_promise<T>;
@@ -41,7 +40,6 @@ public:
 		return handle_.done();
 	}
 
-
 	generator(handle h) : handle_(h) {
 		detail::scheduler_impl::local()->spawn_handle(handle_);
 	}
@@ -49,7 +47,7 @@ public:
 	awaiter operator co_await() {
 		return awaiter(handle_);
 	}
-	
+
 	~generator() {
 		// handle_.destroy();
 	}
@@ -58,4 +56,4 @@ private:
 	handle handle_;
 };
 
-}
+}  // namespace tiny_coroutine

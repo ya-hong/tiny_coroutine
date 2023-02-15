@@ -1,15 +1,13 @@
 #pragma once
 
-
+#include <cassert>
 #include <coroutine>
 #include <thread>
-#include <cassert>
 
 #include "detail/scheduler_impl.hpp"
 
-
 namespace tiny_coroutine {
-	using detail::scheduler_impl;
+using detail::scheduler_impl;
 
 class scheduler {
 public:
@@ -17,7 +15,8 @@ public:
 
 	scheduler(const scheduler&) = delete;
 
-	explicit scheduler(scheduler&& other) : scheduler_pimpl_(other.scheduler_pimpl_) {
+	explicit scheduler(scheduler&& other)
+		: scheduler_pimpl_(other.scheduler_pimpl_) {
 		other.scheduler_pimpl_ = nullptr;
 	}
 
@@ -27,23 +26,19 @@ public:
 		std::swap(scheduler_pimpl_, other.scheduler_pimpl_);
 		return *this;
 	}
-	
+
 	void join() {
 		scheduler_pimpl_->join();
 	}
 
-	template<typename _Callable, typename... _Args>
+	template <typename _Callable, typename... _Args>
 	void spawn(_Callable&& __f, _Args&&... __args) {
-		scheduler_pimpl_->spawn(std::forward<_Callable>(__f), std::forward<_Args>(__args)...);
+		scheduler_pimpl_->spawn(std::forward<_Callable>(__f),
+								std::forward<_Args>(__args)...);
 	}
 
 private:
-
 	scheduler_impl* scheduler_pimpl_;
-
 };
 
-
-
-}
-
+}  // namespace tiny_coroutine

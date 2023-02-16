@@ -12,4 +12,3 @@ foreach(file IN LISTS examples)
 	add_executable(${example} ${file})
 	target_link_libraries(${example} tiny_coroutine)
 endforeach(file)
-

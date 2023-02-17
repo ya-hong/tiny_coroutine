@@ -8,6 +8,8 @@
 #include <thread>
 #include <type_traits>
 
+#include "promise_state.hpp"
+
 namespace tiny_coroutine {
 
 namespace detail {
@@ -26,9 +28,17 @@ public:
 		host_thread_.join();
 	}
 
-	void spawn_handle(std::coroutine_handle<> h) {
+	template <typename promise_type>
+	void spawn_handle(std::coroutine_handle<promise_type> h) {
 		std::lock_guard<std::mutex> lg{mutex_};
-		fragment_queue_.push([h]() { h.resume(); });
+		fragment_queue_.push([h]() {
+			// if (h.promise().state() == promise_state::ABANDON ||
+			// h.promise().state() == promise_state::ABORTION) { h.destroy();
+			// }
+			// else {
+			h.resume();
+			// }
+		});
 	}
 
 	template <typename _Callable, typename... _Args>

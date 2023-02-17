@@ -23,6 +23,7 @@ public:
 	}
 
 	T await_resume() {
+		scheduler_impl::local()->spawn_handle(waited_);	 // destory
 		return waited_.promise().result();
 	}
 

@@ -3,7 +3,9 @@
 #include <coroutine>
 
 #include "handle.hpp"
+#include "promise_state.hpp"
 #include "scheduler_impl.hpp"
+#include "store.hpp"
 
 namespace tiny_coroutine {
 
@@ -13,58 +15,10 @@ class generator;
 namespace detail {
 
 template <typename T>
-class multi_temporary_store {
+class multi_entry_promise {
 public:
-	multi_temporary_store() : stored_(false) {}
+	multi_entry_promise() : state_(promise_state::PREGNANCY) {}
 
-	T result() {
-		stored_ = false;
-		return std::forward<T>(value_);
-	}
-
-	bool has_result() {
-		return stored_;
-	}
-
-protected:
-	void update_value(T&& value) {
-		std::construct_at(&value_, std::forward<T>(value));
-		stored_ = true;
-	}
-
-private:
-	T value_;
-	bool stored_;
-};
-
-template <typename T>
-class multi_temporary_store<T&> {
-public:
-	multi_temporary_store() : stored_(false) {}
-
-	T& result() {
-		stored_ = false;
-		return *ptr_;
-	}
-
-	bool has_result() {
-		return stored_;
-	}
-
-protected:
-	void update_value(T& value) {
-		ptr_ = &value;
-		stored_ = true;
-	}
-
-private:
-	T* ptr_;
-	bool stored_;
-};
-
-template <typename T>
-class multi_entry_promise : public multi_temporary_store<T> {
-public:
 	generator<T> get_return_object() noexcept {
 		return generator<T>(multi_entry_handle<T>::from_promise(*this));
 	}
@@ -86,10 +40,12 @@ public:
 	}
 
 	std::suspend_always yield_value(T value) {
-		std::cout << "yield value " << value << std::endl;
-		multi_temporary_store<T>::update_value(std::forward<T>(value));
+		if (state_ == promise_state::REPREGNANCY) {
+			store_.erase();
+		}
+		store_.write(std::forward<T>(value));
+		transfer_write(state_);
 		if (parent_handle() && !parent_handle().done()) {
-			std::cout << "spawn parent" << std::endl;
 			scheduler_impl::local()->spawn_handle(parent_handle());
 			scheduler_impl::local()->spawn_handle(
 				multi_entry_handle<T>::from_promise(*this));
@@ -99,8 +55,30 @@ public:
 
 	void return_void() {}
 
+	T result() {
+		transfer_read(state_);
+		return store_.read();
+	}
+
+	void mark_cancel() noexcept {
+		transfer_cancel(state_);
+	}
+
+	promise_state state() const noexcept {
+		return state_;
+	}
+
+	~multi_entry_promise() {
+		transfer_cancel(state_);
+		if (state_ == promise_state::ABANDON) {
+			store_.erase();
+		}
+	}
+
 private:
 	std::coroutine_handle<> parent_handle_;
+	promise_state state_;
+	store<T> store_;
 };
 
 }  // namespace detail

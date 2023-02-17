@@ -3,8 +3,10 @@
 #include <coroutine>
 
 #include "handle.hpp"
+#include "promise_state.hpp"
 #include "scheduler_impl.hpp"
-// #include "../task.hpp"
+#include "store.hpp"
+#include "tiny_coroutine/task.hpp"
 
 namespace tiny_coroutine {
 
@@ -21,12 +23,19 @@ public:
 		return {};
 	}
 
-	std::suspend_always final_suspend() noexcept {
-		if (parent_handle() && !parent_handle().done()) {
-			std::cout << parent_handle().address() << std::endl;
-			scheduler_impl::local()->spawn_handle(parent_handle());
-		}
-		return {};
+	auto final_suspend() noexcept {
+		struct awaiter {
+			awaiter(promise_no_type* p) : p(p) {}
+			bool await_ready() noexcept {
+				return (bool)p->parent_handle();
+			}
+			void await_suspend(std::coroutine_handle<> handle) noexcept {
+				scheduler_impl::local()->spawn_handle(p->parent_handle());
+			}
+			void await_resume() noexcept {}
+			promise_no_type* p;
+		};
+		return awaiter(this);
 	}
 
 	std::coroutine_handle<>& parent_handle() noexcept {
@@ -42,48 +51,69 @@ private:
 };
 
 template <typename T>
-class temporary_store {
+class promise : public promise_no_type {
 public:
-	void return_value(T&& value) {
-		std::construct_at(&value_, std::forward<T>(value));
-	}
+	promise() : parent_handle_(nullptr), state_(promise_state::PREGNANCY) {}
 
-	T result() {
-		return std::forward<T>(value_);
-	}
-
-private:
-	T value_;
-};
-
-template <typename T>
-class temporary_store<T&> {
-public:
-	void return_value(T& value) {
-		ptr_ = &value;
-	}
-
-	T& result() {
-		return *ptr_;
-	}
-
-private:
-	T* ptr_;
-};
-
-template <>
-class temporary_store<void> {
-public:
-	void return_void() {}
-	void result() {}
-};
-
-template <typename T>
-class promise : public promise_no_type, public temporary_store<T> {
-public:
 	task<T> get_return_object() noexcept {
 		return task<T>(handle<T>::from_promise(*this));
 	}
+
+	void return_value(T&& value) {
+		store_.write(std::forward<T>(value));
+		transfer_write(state_);
+	}
+
+	T result() {
+		transfer_read(state_);
+		return store_.read();
+	}
+
+	void mark_cancel() noexcept {
+		transfer_cancel(state_);
+	}
+
+	promise_state state() const noexcept {
+		return state_;
+	}
+
+	~promise() noexcept {
+		transfer_cancel(state_);
+		if (state_ == promise_state::ABANDON) {
+			store_.erase();
+		}
+	}
+
+private:
+	std::coroutine_handle<> parent_handle_;
+	promise_state state_;
+	store<T> store_;
+};
+
+template <>
+class promise<void> : public promise_no_type {
+public:
+	promise() : parent_handle_(nullptr), state_(promise_state::PREGNANCY) {}
+
+	task<void> get_return_object() noexcept {
+		return task<void>(handle<void>::from_promise(*this));
+	}
+
+	void return_void() {}
+
+	void result() {}
+
+	void mark_cancel() noexcept {
+		transfer_cancel(state_);
+	}
+
+	promise_state state() const noexcept {
+		return state_;
+	}
+
+private:
+	std::coroutine_handle<> parent_handle_;
+	promise_state state_;
 };
 
 }  // namespace detail

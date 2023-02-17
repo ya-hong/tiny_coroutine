@@ -3,6 +3,7 @@
 #include <coroutine>
 
 #include "handle.hpp"
+#include "promise_state.hpp"
 #include "scheduler_impl.hpp"
 
 namespace tiny_coroutine {
@@ -15,7 +16,7 @@ public:
 	multi_entry_awaiter(multi_entry_handle<T> h) : waited_(h) {}
 
 	bool await_ready() {
-		return waited_.promise().has_result();
+		return waited_.promise().state() == promise_state::BIRTH;
 	}
 
 	void await_suspend(std::coroutine_handle<> waiter) {

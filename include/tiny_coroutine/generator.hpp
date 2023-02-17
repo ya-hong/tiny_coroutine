@@ -49,7 +49,7 @@ public:
 	}
 
 	~generator() {
-		// handle_.destroy();
+		handle_.promise().mark_cancel();
 	}
 
 private:

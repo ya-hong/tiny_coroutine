@@ -1,6 +1,7 @@
 #include <coroutine>
 #include <functional>
 
+#include "detail/promis_no_type.hpp"
 #include "detail/scheduler_impl.hpp"
 #include "task.hpp"
 
@@ -10,8 +11,10 @@ struct slicer {
 	bool await_ready() {
 		return false;
 	}
-	void await_suspend(std::coroutine_handle<> waiter) {
-		detail::scheduler_impl::local()->spawn_handle(waiter);
+
+	template <typename promise>
+	void await_suspend(std::coroutine_handle<promise> waiter) {
+		waiter.promise().schedule_awake();
 	}
 	void await_resume() {}
 };

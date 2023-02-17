@@ -9,10 +9,13 @@
 #include <type_traits>
 
 #include "promise_state.hpp"
+// #include "promis_no_type.hpp"
 
 namespace tiny_coroutine {
 
 namespace detail {
+
+class promise_no_type;
 
 class scheduler_impl {
 public:
@@ -28,17 +31,20 @@ public:
 		host_thread_.join();
 	}
 
-	template <typename promise_type>
-	void spawn_handle(std::coroutine_handle<promise_type> h) {
+	// template <typename promise_type>
+	void spawn_lambda(std::function<void()> lambda) {
 		std::lock_guard<std::mutex> lg{mutex_};
-		fragment_queue_.push([h]() {
-			// if (h.promise().state() == promise_state::ABANDON ||
-			// h.promise().state() == promise_state::ABORTION) { h.destroy();
-			// }
-			// else {
-			h.resume();
-			// }
-		});
+		fragment_queue_.push(lambda);
+		// fragment_queue_.push([promise_ptr]() {
+		// 	auto handle = std::coroutine_handle<>::from_address(promise_ptr);
+		// 	if (promise_ptr->state() == promise_state::ABANDON ||
+		// promise_ptr->state() == promise_state::ABORTION) {
+		// handle.destroy();
+		// 	}
+		// 	else {
+		// 		handle.resume();
+		// 	}
+		// });
 	}
 
 	template <typename _Callable, typename... _Args>

@@ -2,8 +2,9 @@
 
 #include "detail/awaiter.hpp"
 #include "detail/handle.hpp"
-#include "detail/promise.hpp"
+#include "detail/promise_state.hpp"
 #include "detail/scheduler_impl.hpp"
+#include "detail/task_promise.hpp"
 
 namespace tiny_coroutine {
 
@@ -37,7 +38,7 @@ public:
 	}
 
 	task(handle h) : handle_(h) {
-		detail::scheduler_impl::local()->spawn_handle(handle_);
+		handle_.promise().schedule_awake();
 	}
 
 	awaiter operator co_await() {
@@ -45,7 +46,7 @@ public:
 	}
 
 	~task() {
-		// handle_.destroy();
+		handle_.promise().mark_detach();
 	}
 
 private:

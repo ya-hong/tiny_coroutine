@@ -16,11 +16,12 @@ public:
 	multi_entry_awaiter(multi_entry_handle<T> h) : waited_(h) {}
 
 	bool await_ready() {
-		return waited_.promise().state() == promise_state::BIRTH;
+		return waited_.promise().state() == promise_state::Birth;
 	}
 
-	void await_suspend(std::coroutine_handle<> waiter) {
-		waited_.promise().parent_handle() = waiter;
+	template <typename promise>
+	void await_suspend(std::coroutine_handle<promise> waiter) {
+		waited_.promise().set_parent(waiter);
 	}
 
 	T await_resume() {

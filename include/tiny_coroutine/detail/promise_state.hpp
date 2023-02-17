@@ -7,37 +7,54 @@ namespace tiny_coroutine {
 namespace detail {
 
 enum promise_state {
-	PREGNANCY,	  // no result
-	BIRTH,		  // has result and not read
-	REPREGNANCY,  // has result and read (prepare for generate new result)
-	ABORTION,	  // do not need deconstruct
-	ABANDON,	  // need deconstruct
+	Pregnancy,	  // no result
+	Detach,		  // no result & do not care result
+	Birth,		  // has result and not read
+	RePregnancy,  // has result and read (prepare for generate new result)
+	Abort,		  //
+				  // Abandon,	  		// need deconstruct
 };
 
-void transfer_write(promise_state &state) {
-	assert(state != promise_state::ABORTION &&
-		   state != promise_state::ABANDON && "coroutine canceled");
-	state = promise_state::BIRTH;
-}
+/**
+ *   Detach -----------------------------|
+ *     ↑                                 |
+ *     |                                 |
+ * Pregnancy  ---------------------------|
+ * |   |                                 |
+ * |   ↓                                 ↓
+ * | Birth ----------------------------> Abort
+ * |  ↑  |                               ↑
+ * ↓  |  ↓                               |
+ *  RePregnancy -------------------------|
+ *
+ *
+ */
 
-void transfer_read(promise_state &state) {
-	assert(state == promise_state::BIRTH && "await not ready");
-	state = promise_state::REPREGNANCY;
-}
+// void transfer_write(promise_state &state) {
+// 	assert(state != promise_state::ABORTION &&
+// 		   state != promise_state::ABANDON && "coroutine canceled");
+// 	state = promise_state::BIRTH;
+// }
 
-void transfer_cancel(promise_state &state) {
-	switch (state) {
-	case promise_state::PREGNANCY:
-		state = promise_state::ABORTION;
-		break;
-	case promise_state::BIRTH:
-	case promise_state::REPREGNANCY:
-		state = promise_state::ABANDON;
-		break;
-	default:
-		break;
-	}
-}
+// void transfer_read(promise_state &state) {
+// 	assert(state == promise_state::BIRTH && "await not ready");
+// 	state = promise_state::REPREGNANCY;
+// }
+
+// void transfer_cancel(promise_state &state) {
+// 	switch (state) {
+// 	case promise_state::Pregnancy:
+// 	case promise_state::DETACH_PREGNANCY:
+// 		state = promise_state::ABORTION;
+// 		break;
+// 	case promise_state::BIRTH:
+// 	case promise_state::REPREGNANCY:
+// 		state = promise_state::ABANDON;
+// 		break;
+// 	default:
+// 		break;
+// 	}
+// }
 
 }  // namespace detail
 

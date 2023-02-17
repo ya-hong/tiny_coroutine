@@ -41,7 +41,7 @@ public:
 	}
 
 	generator(handle h) : handle_(h) {
-		detail::scheduler_impl::local()->spawn_handle(handle_);
+		handle_.promise().schedule_awake();
 	}
 
 	awaiter operator co_await() {
@@ -49,7 +49,7 @@ public:
 	}
 
 	~generator() {
-		handle_.promise().mark_cancel();
+		handle_.promise().abort();
 	}
 
 private:

@@ -93,8 +93,13 @@ public:
 	}
 
 	~multi_entry_promise() {
-		std::cout << "deconstruct" << std::endl;
-		abort();
+		switch (state_) {
+		case promise_state::Birth:
+		case promise_state::RePregnancy:
+			prev_.erase();
+			curr_.erase();
+			break;
+		}
 	}
 
 private:

@@ -15,12 +15,15 @@ namespace detail {
 
 template <typename T>
 struct store {
-	void write(T&& value) {
+	template <typename U>
+	void write(U&& value) {
 		std::construct_at(&store_.value_, std::move(value));
 	}
+
 	T read() {
 		return std::move(store_.value_);
 	}
+
 	void erase() {
 		store_.value_.~T();
 	}

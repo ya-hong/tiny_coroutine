@@ -30,10 +30,11 @@ public:
 		return handle<T>::from_address(get_handle().address());
 	}
 
-	void return_value(T&& value) {	// coroutine will be removed from queue
+	template <typename U>
+	void return_value(U&& value) {	// coroutine will be removed from queue
 		switch (state_) {
 		case promise_state::Pregnancy:
-			store_.write(std::forward<T>(value));
+			store_.write(std::forward<U>(value));
 			state_ = promise_state::Birth;
 			try_schedule_awake_parent();  // Notify the father after the birth
 										  // of the child (If there is) XD
@@ -56,7 +57,7 @@ public:
 		return store_.read();
 	}
 
-	void mark_detach() {
+	void detach() {
 		switch (state_) {
 		case promise_state::Pregnancy:	// coroutine will return queue
 			state_ = promise_state::Detach;
@@ -86,7 +87,12 @@ public:
 	}
 
 	~promise() noexcept {
-		abort();
+		switch (state_) {
+		case promise_state::Birth:
+		case promise_state::RePregnancy:
+			store_.erase();
+			break;
+		}
 	}
 
 private:
@@ -126,7 +132,7 @@ public:
 		state_ = promise_state::RePregnancy;
 	}
 
-	void mark_detach() {  // coroutine should be in queue
+	void detach() {	 // coroutine should be in queue
 		switch (state_) {
 		case promise_state::Pregnancy:
 			state_ = promise_state::Detach;

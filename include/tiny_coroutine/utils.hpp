@@ -1,5 +1,7 @@
 #include <coroutine>
+#include <ctime>
 #include <functional>
+#include <optional>
 
 #include "detail/promis_no_type.hpp"
 #include "detail/scheduler_impl.hpp"
@@ -24,6 +26,25 @@ task<void> condition(std::function<bool()> lambda) {
 		co_await slicer();
 	}
 	co_return;
+}
+
+task<void> sleep(time_t sec) {
+	auto stop_time = time(nullptr) + sec;
+	while (time(nullptr) < stop_time) {
+		co_await slicer();
+	}
+	co_return;
+}
+
+template <typename T>
+task<std::optional<T>> timeout(task<T> coroutine, time_t sec) {
+	auto stop_time = time(nullptr) + sec;
+	while (time(nullptr) < stop_time) {
+		if (coroutine.await_ready()) co_return co_await coroutine;
+		co_await slicer();
+	}
+	coroutine.abort();
+	co_return std::nullopt;
 }
 
 }  // namespace tiny_coroutine

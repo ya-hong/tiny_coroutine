@@ -45,8 +45,30 @@ public:
 		return awaiter(handle_);
 	}
 
+	bool await_ready() const {
+		return (bool)handle_ && handle_.done();
+	}
+
+	void abort() {
+		if (!handle_) {
+			throw "this task<> no longer manages the lifetime of coroutines";
+		}
+		handle_.promise().abort();
+		handle_ = handle(nullptr);
+	}
+
+	void detach() {
+		if (!handle_) {
+			throw "this task<> no longer manages the lifetime of coroutines";
+		}
+		handle_.promise().detach();
+		handle_ = handle(nullptr);
+	}
+
 	~task() {
-		handle_.promise().mark_detach();
+		if (handle_) {
+			detach();
+		}
 	}
 
 private:

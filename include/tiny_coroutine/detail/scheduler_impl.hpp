@@ -47,22 +47,6 @@ public:
 		// });
 	}
 
-	template <typename _Callable, typename... _Args>
-	void spawn(_Callable&& __f, _Args&&... __args) {
-		// static_assert(
-		// 	std::invocable<typename decay<_Callable>::type, typename
-		// decay<_Args>::type...>, 	"std::thread arguments must be invocable
-		// after conversion to rvalues"
-		// );
-
-		std::lock_guard<std::mutex> lg{mutex_};
-		fragment_queue_.push(
-			[__f{std::forward<_Callable>(__f)},
-			 ... __args{std::forward<_Args>(__args)}]() mutable {
-				__f(std::forward<_Args>(__args)...);
-			});
-	}
-
 	static scheduler_impl* local() {
 		assert(scheduler_impl::local_scheduler_pimpl_ != nullptr &&
 			   "no local scheduler in this thread!");

@@ -18,63 +18,48 @@ namespace detail {
 
 class promise_no_type {
 public:
-	promise_no_type(std::coroutine_handle<> handle)
-		: parent_ptr_(nullptr),
-		  state_(promise_state::Pregnancy),
-		  handle_(handle) {}
+	promise_no_type(co_handle self)
+		: listener_(nullptr), state_(promise_state::Pregnancy), self_(self) {}
 
 	void schedule_awake() {
 		scheduler_impl::local()->spawn_lambda([this]() {
-			if (this->state_ == promise_state::Abort) [[unlikely]] {
-				this->get_handle().destroy();
-			} else {
-				if (!this->get_handle().done()) {
-					this->get_handle().resume();
-				} else {
-					this->get_handle().destroy();
-				}
+			if (this->state_ != promise_state::Abort) [[likely]] {
+				this->get_co_handle().resume();
 			}
 		});
 	}
 
-	void try_schedule_awake_parent() {
-		if (parent_ptr_ == nullptr) return;
-		parent_ptr_->schedule_awake();
-		parent_ptr_ = nullptr;
+	void schedule_destory() {
+		scheduler_impl::local()->spawn_lambda(
+			[this]() { this->get_co_handle().destroy(); });
+	}
+
+	bool try_schedule_awake_parent() {
+		if (listener_ == nullptr || listener_->state() == promise_state::Abort)
+			return false;
+		listener_->schedule_awake();
+		listener_ = nullptr;
+		return true;
 	}
 
 	std::suspend_always initial_suspend() noexcept {
 		return {};
 	}
 
-	auto final_suspend() noexcept {
-		return std::suspend_always{};
-		// struct awaiter {
-		// 	awaiter(promise_no_type* p) : p(p) {}
-		// 	bool await_ready() noexcept {
-		// 		return (bool)p->get_parent_ptr() && p->state_ ==
-		// promise_state::BIRTH;
-		// 	}
-		// 	void await_suspend(std::coroutine_handle<> handle) noexcept {
-		// 		p->schedule_awake(handle);
-		// 	}
-		// 	void await_resume() noexcept {}
-		// 	promise_no_type* p;
-		// };
-		// return awaiter(this);
+	std::suspend_always final_suspend() noexcept {
+		return {};
 	}
 
-	template <typename promise>
-	void set_parent(std::coroutine_handle<promise> handle) noexcept {
-		parent_ptr_ = &handle.promise();
+	void set_listener(pr_handle listener) noexcept {
+		listener_ = listener;
 	}
 
-	promise_no_type* get_parent_ptr() noexcept {
-		return parent_ptr_;
+	pr_handle get_listener_handle() noexcept {
+		return listener_;
 	}
 
-	std::coroutine_handle<> get_handle() noexcept {
-		return handle_;
+	std::coroutine_handle<> get_co_handle() noexcept {
+		return self_;
 	}
 
 	void unhandled_exception() {
@@ -87,8 +72,8 @@ public:
 	}
 
 protected:
-	promise_no_type* parent_ptr_;
-	std::coroutine_handle<> handle_;
+	pr_handle listener_;
+	co_handle self_;
 	promise_state state_;
 };
 

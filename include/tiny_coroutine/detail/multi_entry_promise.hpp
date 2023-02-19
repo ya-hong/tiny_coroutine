@@ -5,13 +5,9 @@
 #include "handle.hpp"
 #include "promis_no_type.hpp"
 #include "promise_state.hpp"
-#include "scheduler_impl.hpp"
 #include "store.hpp"
 
 namespace tiny_coroutine {
-
-// template <typename T>
-// class generator;
 
 namespace detail {
 
@@ -21,10 +17,12 @@ public:
 	multi_entry_promise()
 		: prev_(),
 		  curr_(),
-		  promise_no_type(multi_entry_handle<T>::from_promise(*this)) {}
+		  promise_no_type(
+			  std::coroutine_handle<multi_entry_promise<T>>::from_promise(
+				  *this)) {}
 
-	multi_entry_handle<T> get_return_object() noexcept {
-		return multi_entry_handle<T>::from_promise(*this);
+	multi_entry_promise<T>* get_return_object() noexcept {
+		return this;
 	}
 
 	std::suspend_always yield_value(T value) {
@@ -64,10 +62,10 @@ public:
 	}
 
 	T result() {
-		assert(state_ == promise_state::Birth && "promise state no ready");
+		if (state_ != promise_state::Birth) throw "promise state broken";
 		state_ = promise_state::RePregnancy;
-		if (!get_handle()
-				 .done()) {	   // promise will not control life time of self
+		if (!get_co_handle().done()) {
+			// promise will not control life time of self
 			schedule_awake();  // deliver child, then reproduction
 		}
 		return prev_.read();
@@ -75,31 +73,22 @@ public:
 
 	void abort() {
 		switch (state_) {
+		case promise_state::Abort:
+			return;
 		case promise_state::Pregnancy:
-			state_ = promise_state::Abort;
 			break;
 		case promise_state::Birth:
-			prev_.erase();
-			curr_.erase();
-			state_ = promise_state::Abort;
-			schedule_awake();  // send to destory
 		case promise_state::RePregnancy:
 			prev_.erase();
 			curr_.erase();
-			state_ = promise_state::Abort;
-			if (get_handle().done()) schedule_awake();	// send to destory
 			break;
 		}
+		state_ = promise_state::Abort;
+		schedule_destory();	 // send to destory
 	}
 
 	~multi_entry_promise() {
-		switch (state_) {
-		case promise_state::Birth:
-		case promise_state::RePregnancy:
-			prev_.erase();
-			curr_.erase();
-			break;
-		}
+		assert(state_ == promise_state::Abort);
 	}
 
 private:

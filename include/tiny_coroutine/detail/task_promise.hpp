@@ -24,10 +24,13 @@ namespace detail {
 template <typename T>
 class promise : public promise_no_type {
 public:
-	promise() : store_(), promise_no_type(handle<T>::from_promise(*this)) {}
+	promise()
+		: store_(),
+		  promise_no_type(
+			  std::coroutine_handle<promise<T>>::from_promise(*this)) {}
 
-	handle<T> get_return_object() noexcept {
-		return handle<T>::from_address(get_handle().address());
+	promise<T>* get_return_object() noexcept {
+		return this;
 	}
 
 	template <typename U>
@@ -41,18 +44,17 @@ public:
 			break;
 
 		case promise_state::Detach:
-			schedule_awake();  // skip save result, send self to destory
-			state_ = promise_state::Abort;
+			abort();
 			break;
 
 		default:
-			assert(false && "promise state broken");
+			throw "promise state broken";
 			break;
 		}
 	}
 
 	T result() {  // coroutine not in queue
-		assert(state_ == promise_state::Birth && "promise state broken");
+		if (state_ != promise_state::Birth) throw "promise state broken";
 		state_ = promise_state::RePregnancy;
 		return store_.read();
 	}
@@ -72,27 +74,22 @@ public:
 
 	void abort() {
 		switch (state_) {
+		case promise_state::Abort:
+			return;
 		case promise_state::Pregnancy:
 		case promise_state::Detach:
-			state_ = promise_state::Abort;
-			// coroutine will return queue, do not need send to destory
 			break;
 		case promise_state::Birth:
 		case promise_state::RePregnancy:
 			store_.erase();
-			state_ = promise_state::Abort;
-			schedule_awake();  // send to destory
 			break;
 		}
+		state_ = promise_state::Abort;
+		schedule_destory();
 	}
 
 	~promise() noexcept {
-		switch (state_) {
-		case promise_state::Birth:
-		case promise_state::RePregnancy:
-			store_.erase();
-			break;
-		}
+		assert(state_ == promise_state::Abort);
 	}
 
 private:
@@ -102,10 +99,12 @@ private:
 template <>
 class promise<void> : public promise_no_type {
 public:
-	promise() : promise_no_type(handle<void>::from_promise(*this)) {}
+	promise()
+		: promise_no_type(
+			  std::coroutine_handle<promise<void>>::from_promise(*this)) {}
 
-	handle<void> get_return_object() noexcept {
-		return handle<void>::from_promise(*this);
+	promise<void>* get_return_object() noexcept {
+		return this;
 	}
 
 	void return_void() {
@@ -117,34 +116,51 @@ public:
 			break;
 
 		case promise_state::Detach:
-			schedule_awake();  // skip save result, send self to destory
-			state_ = promise_state::Abort;
+			abort();
 			break;
 
 		default:
-			assert(false && "promise state broken");
+			throw "promise state broken";
 			break;
 		}
 	}
 
 	void result() {
-		assert(state_ == promise_state::Birth && "promise state broken");
+		if (state_ != promise_state::Birth) throw "promise state broken";
 		state_ = promise_state::RePregnancy;
 	}
 
 	void detach() {	 // coroutine should be in queue
 		switch (state_) {
-		case promise_state::Pregnancy:
+		case promise_state::Pregnancy:	// coroutine will return queue
 			state_ = promise_state::Detach;
 			break;
-		case promise_state::Birth:
-			state_ = promise_state::Abort;
+		case promise_state::Detach:
+			break;
+		default:  // coroutine will not return queue
+			abort();
 			break;
 		}
 	}
 
 	void abort() {
+		switch (state_) {
+		case promise_state::Abort:
+			return;
+		case promise_state::Pregnancy:
+		case promise_state::Detach:
+			break;
+		case promise_state::Birth:
+		case promise_state::RePregnancy:
+			// erase store
+			break;
+		}
 		state_ = promise_state::Abort;
+		schedule_destory();
+	}
+
+	~promise() {
+		assert(state_ == promise_state::Abort);
 	}
 
 private:

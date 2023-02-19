@@ -9,10 +9,9 @@ namespace detail {
 enum promise_state {
 	Pregnancy,	  // no result
 	Detach,		  // no result & do not care result
-	Birth,		  // has result and not read
-	RePregnancy,  // has result and read (prepare for generate new result)
-	Abort,		  //
-				  // Abandon,	  		// need deconstruct
+	Birth,		  // has result to read
+	RePregnancy,  // have a result and need another result
+	Abort,		  // coroutine end, and already send to destory
 };
 
 /**

@@ -1,35 +1,38 @@
 #pragma once
 
 #include <coroutine>
+#include <type_traits>
 
-#include "handle.hpp"
+#include "promis_no_type.hpp"
 #include "promise_state.hpp"
-#include "scheduler_impl.hpp"
 
 namespace tiny_coroutine {
 
 namespace detail {
 
-template <typename T>
+template <typename PromiseType,
+		  typename std::is_base_of<promise_no_type, PromiseType>::type* =
+			  nullptr>
 class awaiter {
 public:
-	awaiter(handle<T> h) : waited_(h) {}
+	awaiter(PromiseType* handle) : waited_(handle) {}
 
 	bool await_ready() {
-		return waited_.promise().state() == promise_state::Birth;
+		return waited_->state() == promise_state::Birth;
 	}
 
 	template <typename promise>
 	void await_suspend(std::coroutine_handle<promise> waiter) {
-		waited_.promise().set_parent(waiter);
+		waited_->set_listener(&waiter.promise());
 	}
 
-	T await_resume() {
-		return waited_.promise().result();
+	decltype(std::declval<PromiseType>().result())
+	await_resume() {  // can not be auto (auto will remove reference)
+		return waited_->result();
 	}
 
 private:
-	handle<T> waited_;
+	PromiseType* waited_;
 };
 
 }  // namespace detail

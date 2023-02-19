@@ -2,6 +2,7 @@
 #include <ctime>
 #include <functional>
 #include <optional>
+#include <vector>
 
 #include "detail/promis_no_type.hpp"
 #include "detail/scheduler_impl.hpp"
@@ -36,15 +37,58 @@ task<void> sleep(time_t sec) {
 	co_return;
 }
 
-template <typename T>
-task<std::optional<T>> timeout(task<T> coroutine, time_t sec) {
+template <typename T, typename S>
+task<std::optional<T>> timeout(task<T, S>& coroutine, time_t sec) {
 	auto stop_time = time(nullptr) + sec;
 	while (time(nullptr) < stop_time) {
-		if (coroutine.await_ready()) co_return co_await coroutine;
+		if (coroutine.done()) co_return co_await coroutine;
 		co_await slicer();
 	}
-	coroutine.abort();
 	co_return std::nullopt;
+}
+
+template <typename T, typename S>
+task<std::optional<T>> timeout(task<T, S>&& coroutine, time_t sec) {
+	auto stop_time = time(nullptr) + sec;
+	while (time(nullptr) < stop_time) {
+		if (coroutine.done()) co_return co_await coroutine;
+		co_await slicer();
+	}
+	co_return std::nullopt;
+}
+
+template <typename T, typename S>
+task<void, strategy::attach> void_task(task<T, S>&& coroutine) {
+	co_await coroutine;
+	co_return;
+}
+
+template <typename... TaskType>
+task<void> when_any(TaskType&&... tasks) {
+	bool any = false;
+	while (!any) {
+		for (auto&& done : {tasks.done()...}) {
+			if (done) {
+				any = true;
+				break;
+			}
+		}
+		co_await slicer();
+	}
+	co_return;
+}
+
+template <typename... TaskType>
+task<void> when_all(TaskType&&... tasks) {
+	bool all = false;
+	while (!all) {
+		all = true;
+		for (auto&& done : {tasks.done()...}) {
+			all &= done;
+		}
+		co_await slicer();
+	}
+	co_return;
 }
 
 }  // namespace tiny_coroutine

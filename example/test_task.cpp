@@ -19,6 +19,8 @@ task<int&> return_reference() {
 task<void> update() {
 	std::cout << "enter update" << std::endl;
 	auto&& x = co_await return_reference();
+	std::cout << "address local  " << &x << std::endl;
+	std::cout << "address global " << &::x << std::endl;
 	std::cout << "=> update x" << std::endl;
 	x += 1;
 	std::cout << x << std::endl;

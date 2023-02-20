@@ -5,6 +5,7 @@
 #include <thread>
 
 #include "detail/scheduler_impl.hpp"
+#include "task.hpp"
 
 namespace tiny_coroutine {
 using detail::scheduler_impl;
@@ -33,8 +34,12 @@ public:
 
 	template <typename _Callable, typename... _Args>
 	void spawn(_Callable&& __f, _Args&&... __args) {
-		scheduler_pimpl_->spawn(std::forward<_Callable>(__f),
-								std::forward<_Args>(__args)...);
+		auto fragment = [__f{std::forward<_Callable>(__f)},
+						 ... __args{std::forward<_Args>(__args)}]() mutable {
+			strategy::detach::convert(__f(std::forward<_Args>(__args)...));
+		};
+
+		scheduler_pimpl_->spawn_lambda(fragment);
 	}
 
 private:

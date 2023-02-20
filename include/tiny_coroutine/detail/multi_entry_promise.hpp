@@ -3,104 +3,97 @@
 #include <coroutine>
 
 #include "handle.hpp"
-#include "scheduler_impl.hpp"
+#include "promis_no_type.hpp"
+#include "promise_state.hpp"
+#include "store.hpp"
 
 namespace tiny_coroutine {
-
-template <typename T>
-class generator;
 
 namespace detail {
 
 template <typename T>
-class multi_temporary_store {
+class multi_entry_promise : public promise_no_type {
 public:
-	multi_temporary_store() : stored_(false) {}
+	multi_entry_promise()
+		: prev_(),
+		  curr_(),
+		  promise_no_type(
+			  std::coroutine_handle<multi_entry_promise<T>>::from_promise(
+				  *this)) {}
 
-	T result() {
-		stored_ = false;
-		return std::forward<T>(value_);
-	}
-
-	bool has_result() {
-		return stored_;
-	}
-
-protected:
-	void update_value(T&& value) {
-		std::construct_at(&value_, std::forward<T>(value));
-		stored_ = true;
-	}
-
-private:
-	T value_;
-	bool stored_;
-};
-
-template <typename T>
-class multi_temporary_store<T&> {
-public:
-	multi_temporary_store() : stored_(false) {}
-
-	T& result() {
-		stored_ = false;
-		return *ptr_;
-	}
-
-	bool has_result() {
-		return stored_;
-	}
-
-protected:
-	void update_value(T& value) {
-		ptr_ = &value;
-		stored_ = true;
-	}
-
-private:
-	T* ptr_;
-	bool stored_;
-};
-
-template <typename T>
-class multi_entry_promise : public multi_temporary_store<T> {
-public:
-	generator<T> get_return_object() noexcept {
-		return generator<T>(multi_entry_handle<T>::from_promise(*this));
-	}
-
-	std::suspend_always initial_suspend() noexcept {
-		return {};
-	}
-
-	std::suspend_never final_suspend() noexcept {
-		return {};
-	}
-
-	std::coroutine_handle<>& parent_handle() noexcept {
-		return parent_handle_;
-	}
-
-	void unhandled_exception() {
-		// TODO
+	multi_entry_promise<T>* get_return_object() noexcept {
+		return this;
 	}
 
 	std::suspend_always yield_value(T value) {
-		std::cout << "yield value " << value << std::endl;
-		multi_temporary_store<T>::update_value(std::forward<T>(value));
-		if (parent_handle() && !parent_handle().done()) {
-			std::cout << "spawn parent" << std::endl;
-			scheduler_impl::local()->spawn_handle(parent_handle());
-			scheduler_impl::local()->spawn_handle(
-				multi_entry_handle<T>::from_promise(*this));
+		switch (state_) {
+		case promise_state::Pregnancy:
+			curr_.write(std::forward<T>(value));
+			state_ = promise_state::RePregnancy;
+			schedule_awake();
+			break;
+		case promise_state::RePregnancy:
+			prev_.write(curr_.read());
+			curr_.write(std::forward<T>(value));
+			state_ = promise_state::Birth;
+			try_schedule_awake_parent();
+			break;
+		default:
+			throw "promise state broken";
+			break;
 		}
+
 		return {};
 	}
 
-	void return_void() {}
+	void return_void() {
+		switch (state_) {
+		case promise_state::Pregnancy:
+			break;
+		case promise_state::RePregnancy:
+			prev_.write(curr_.read());
+			state_ = promise_state::Birth;
+			try_schedule_awake_parent();
+			break;
+		default:
+			throw "promise state broken";
+			break;
+		}
+	}
+
+	T result() {
+		if (state_ != promise_state::Birth) throw "promise state broken";
+		state_ = promise_state::RePregnancy;
+		if (!get_co_handle().done()) {
+			// promise will not control life time of self
+			schedule_awake();  // deliver child, then reproduction
+		}
+		return prev_.read();
+	}
+
+	void abort() {
+		switch (state_) {
+		case promise_state::Abort:
+			return;
+		case promise_state::Pregnancy:
+			break;
+		case promise_state::Birth:
+		case promise_state::RePregnancy:
+			prev_.erase();
+			curr_.erase();
+			break;
+		}
+		state_ = promise_state::Abort;
+		schedule_destory();	 // send to destory
+	}
+
+	~multi_entry_promise() {
+		assert(state_ == promise_state::Abort);
+	}
 
 private:
-	std::coroutine_handle<> parent_handle_;
+	store<T> prev_;
+	store<T> curr_;
 };
 
 }  // namespace detail

@@ -8,9 +8,14 @@
 #include <thread>
 #include <type_traits>
 
+#include "promise_state.hpp"
+// #include "promis_no_type.hpp"
+
 namespace tiny_coroutine {
 
 namespace detail {
+
+class promise_no_type;
 
 class scheduler_impl {
 public:
@@ -26,25 +31,20 @@ public:
 		host_thread_.join();
 	}
 
-	void spawn_handle(std::coroutine_handle<> h) {
+	// template <typename promise_type>
+	void spawn_lambda(std::function<void()> lambda) {
 		std::lock_guard<std::mutex> lg{mutex_};
-		fragment_queue_.push([h]() { h.resume(); });
-	}
-
-	template <typename _Callable, typename... _Args>
-	void spawn(_Callable&& __f, _Args&&... __args) {
-		// static_assert(
-		// 	std::invocable<typename decay<_Callable>::type, typename
-		// decay<_Args>::type...>, 	"std::thread arguments must be invocable
-		// after conversion to rvalues"
-		// );
-
-		std::lock_guard<std::mutex> lg{mutex_};
-		fragment_queue_.push(
-			[__f{std::forward<_Callable>(__f)},
-			 ... __args{std::forward<_Args>(__args)}]() mutable {
-				__f(std::forward<_Args>(__args)...);
-			});
+		fragment_queue_.push(lambda);
+		// fragment_queue_.push([promise_ptr]() {
+		// 	auto handle = std::coroutine_handle<>::from_address(promise_ptr);
+		// 	if (promise_ptr->state() == promise_state::ABANDON ||
+		// promise_ptr->state() == promise_state::ABORTION) {
+		// handle.destroy();
+		// 	}
+		// 	else {
+		// 		handle.resume();
+		// 	}
+		// });
 	}
 
 	static scheduler_impl* local() {

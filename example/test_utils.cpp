@@ -9,7 +9,7 @@
 using namespace tiny_coroutine;
 
 task<int> get_value() {
-	co_await sleep(5);
+	co_await timeout(5);
 	co_return 114514;
 }
 
@@ -24,7 +24,7 @@ task<void> test_time_out() {
 
 task<void> test_time_out2() {
 	auto t = get_value();
-	co_await when_any(t, sleep(2));
+	co_await when_any(t, timeout(2));
 	if (t.done()) {
 		std::cout << "getvalue " << co_await t << std::endl;
 	} else {
@@ -34,7 +34,7 @@ task<void> test_time_out2() {
 
 task<void> test_time_out3() {
 	auto t = get_value();
-	co_await when_all(t, sleep(2));
+	co_await when_all(t, timeout(2));
 	if (t.done()) {
 		std::cout << "getvalue " << co_await t << std::endl;
 	} else {
